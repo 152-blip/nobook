@@ -202,10 +202,10 @@ export default function PassDetails() {
               <Text style={styles.mainText}>24 May 2026, 07:46 AM</Text>
 
               <Text style={styles.smallLabel}>Pass valid from</Text>
-              <Text style={styles.mainText}>31 May 2026, 12:00 AM</Text>
+              <Text style={styles.mainText}>24 May 2026, 12:00 AM</Text>
 
               <Text style={styles.smallLabel}>Pass valid till</Text>
-              <Text style={styles.mainText}>31 May 2026, 11:59 PM</Text>
+              <Text style={styles.mainText}>30 May 2026, 11:59 PM</Text>
             </View>
 
             <TouchableOpacity activeOpacity={0.9} onPress={() => setShowImagePreview(true)}>
@@ -332,7 +332,7 @@ export default function PassDetails() {
               </View>
               <View style={styles.metaTableRow}>
                 <Text style={styles.metaTableLabel}>Pass valid till</Text>
-                <Text style={styles.metaTableValue}>31 May 2026, 11:59 PM</Text>
+                <Text style={styles.metaTableValue}>30 May 2026, 11:59 PM</Text>
               </View>
               <View style={styles.dividerLine} />
               <View style={[styles.metaTableRow, { marginBottom: 0, marginTop: 8 }]}>
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   bookingTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '600',
     color: '#222',
   },
@@ -528,8 +528,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   profileImage: {
-    width: 95,
-    height: 95,
+    width: 100,
+    height: 100,
     borderRadius: 48,
     marginLeft: 15,
     marginTop: 6,
@@ -554,22 +554,29 @@ invoiceButton: {
   flexDirection: 'row',
   alignItems: 'center',
   justifyContent: 'center',
-  marginTop: 10,
-  borderWidth: 1,
-  borderColor: '#b2f5ea',
-  paddingVertical: 14,
-  borderRadius: 10,
-  gap: 8, // This keeps a perfect 8px space between the envelope and the text
+  marginTop: 7,
+  borderWidth: 2,
+  borderColor: '#47af9d',
+  
+  // 1. Shrink the height/thickness
+  paddingVertical: 8,       // Reduced from 12 to 8 for a sleeker profile
+  paddingHorizontal: 20,    // Adds comfortable breathing room on the sides
+  
+  // 2. Shrink the width
+  alignSelf: 'center',      // Forces the button to only be as wide as its content
+  borderRadius: 8,          // Slightly smaller radius matches the smaller size better
+  gap: 8, 
 },
   invoiceText: {
-    color: '#00b894',
+    color: '#40c4aa',
     marginLeft: 8,
     fontSize: 14,
   },
   statusCard: {
     backgroundColor: '#c8df8b',
     borderRadius: 16,
-    padding: 18,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     marginTop: 20,
   },
   statusLabel: {
@@ -666,7 +673,7 @@ invoiceButton: {
   dividerLine: {
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
-    marginTop: 8,
+    marginTop: 2,
   },
   farePriceValue: {
     fontSize: 16,
