@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,49 +7,119 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  Pressable,
+  Animated,
+  Easing,
 } from 'react-native';
+
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function PassDetails() {
-  // State hook to toggle the Terms and Conditions dropdown panel
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  // State handling visibility of the automatic success popup modal layout
   const [isSuccessVisible, setIsSuccessVisible] = useState(false);
+  const [showFare, setShowFare] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [animationToggle, setAnimationToggle] = useState(false);
 
-  // Hook to capture parameter messages routed backward from the validation input screen
-  const params = useLocalSearchParams<{ validated?: string; busNumber?: string }>();
+  // Core web-safe Animated drivers to completely replace Moti
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const opacityAnim = useRef(new Animated.Value(0.6)).current;
+  const checkScaleAnim = useRef(new Animated.Value(0.96)).current;
 
-  // Extract the custom validated bus number string if present
+  const params = useLocalSearchParams();
   const busNumber = params.busNumber;
 
-  // Watch for the validation parameter trigger sent back upon completing the code entry matrix
+  // Manage animation loops safely for web and native runtimes
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isSuccessVisible) {
+      interval = setInterval(() => {
+        setAnimationToggle((prev) => !prev);
+      }, 2200);
+
+      // Reset values before triggering loops
+      scaleAnim.setValue(0.9);
+      opacityAnim.setValue(0.6);
+      checkScaleAnim.setValue(0.96);
+
+      // 1. Outer Ring Pulse Animation Loop
+      Animated.loop(
+        Animated.parallel([
+          Animated.timing(scaleAnim, {
+            toValue: 1.6,
+            duration: 1800,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: false,
+          }),
+          Animated.timing(opacityAnim, {
+            toValue: 0,
+            duration: 1800,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+
+      // 2. Inner Checkbox Breathing Animation Loop
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(checkScaleAnim, {
+            toValue: 1.04,
+            duration: 1100,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: false,
+          }),
+          Animated.timing(checkScaleAnim, {
+            toValue: 0.96,
+            duration: 1100,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: false,
+          }),
+        ])
+      ).start();
+    } else {
+      scaleAnim.stopAnimation();
+      opacityAnim.stopAnimation();
+      checkScaleAnim.stopAnimation();
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isSuccessVisible]);
+
   useEffect(() => {
     if (params.validated === 'true') {
       setIsSuccessVisible(true);
-
-      // Clean up parameter data pointers to ensure popups don't persist during standard re-renders
-      router.setParams({ validated: undefined });
+      router.setParams({
+        validated: undefined,
+      });
     }
   }, [params.validated]);
 
-  // Helper function to format the validation timestamp dynamically
+  const handleVerificationDone = () => {
+    setIsSuccessVisible(false);
+  };
+
   const getFormattedDateTime = () => {
     const now = new Date();
-    
     const day = now.getDate();
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthNames = [
+      'Jan', 'Feb', 'Mar', 'Apr',
+      'May', 'Jun', 'Jul', 'Aug',
+      'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+
     const month = monthNames[now.getMonth()];
     const year = now.getFullYear();
-
     let hours = now.getHours();
     const minutes = String(now.getMinutes()).padStart(2, '0');
-    
     const ampm = hours >= 12 ? 'PM' : 'AM';
+
     hours = hours % 12;
-    hours = hours ? hours : 12; 
+    hours = hours ? hours : 12;
     const formattedHours = String(hours).padStart(2, '0');
 
     return `${day} ${month} ${year}, ${formattedHours}:${minutes} ${ampm}`;
@@ -61,18 +131,17 @@ export default function PassDetails() {
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* HEADER */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#fff" />
           </TouchableOpacity>
 
           <Text style={styles.headerTitle}>Your Bus Pass</Text>
-
           <Text style={styles.cancelText}>Cancel</Text>
         </View>
 
-        {/* Top Card */}
+        {/* TOP CARD */}
         <View style={styles.topCard}>
           <View style={styles.topRow}>
             <View style={styles.circle}>
@@ -84,15 +153,11 @@ export default function PassDetails() {
             </View>
 
             <View style={{ flex: 1, marginLeft: 15 }}>
-              <Text style={styles.passTitle}>
-                Ordinary Weekly Pass
-              </Text>
-
+              <Text style={styles.passTitle}>Ordinary Weekly Pass</Text>
               <View style={styles.badgeRow}>
                 <View style={styles.greenBadge}>
                   <Text style={styles.greenBadgeText}>Weekly</Text>
                 </View>
-
                 <View style={styles.grayBadge}>
                   <Text style={styles.grayBadgeText}>Ordinary</Text>
                 </View>
@@ -105,22 +170,22 @@ export default function PassDetails() {
             <Text style={styles.value}>TPASS894642911</Text>
           </View>
 
-          {/* Cleaned Route path redirection execution mapping */}
-          <TouchableOpacity 
+          <View style={styles.divider} />
+
+          <TouchableOpacity
             style={styles.validateButton}
-            onPress={() => router.push('./validation')} 
+            onPress={() => router.push('./validation')}
           >
             <Text style={styles.validateText}>Validate Pass</Text>
           </TouchableOpacity>
 
-          <Text style={styles.infoText}>
-            ⓘ How to Validate Your Pass?
-          </Text>
+          <Text style={styles.infoText}>ⓘ How to Validate Your Pass?</Text>
         </View>
 
-        {/* Booking Details Card */}
+        {/* COMBINED DETAILS CARD */}
         <View style={styles.detailsCard}>
           <Text style={styles.bookingTitle}>Booking Details</Text>
+          <View style={styles.divider} />
 
           <View style={styles.detailsContent}>
             <View style={{ flex: 1 }}>
@@ -143,113 +208,118 @@ export default function PassDetails() {
               <Text style={styles.mainText}>31 May 2026, 11:59 PM</Text>
             </View>
 
-            <Image
-              source={require('../../assets/images/WIN_20260523_22_31_49_Pro.jpg')}
-              style={styles.profileImage}
-            />
+            <TouchableOpacity activeOpacity={0.9} onPress={() => setShowImagePreview(true)}>
+              <Image
+                source={require('../../assets/images/dophamine.jpg')}
+                style={styles.profileImage}
+              />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.fareRow}>
-            <Text style={styles.smallLabel}>Pass fare</Text>
+            <TouchableOpacity onPress={() => setShowFare(true)}>
+              <Text style={styles.fareLabelText}>Pass fare</Text>
+            </TouchableOpacity>
             <Text style={styles.price}>₹ 350.0</Text>
           </View>
 
-          <TouchableOpacity style={styles.invoiceButton}>
-            <MaterialCommunityIcons name="email-open" size={18} color="#00b894" />
-            <Text style={styles.invoiceText}>Generate mail receipt</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.divider} />
 
-        {/* Dynamic Validation Status Card Container Element */}
-        <View style={styles.statusCard}>
-          <Text style={styles.statusLabel}>Last Validated</Text>
-          <Text style={styles.statusValue}>{getFormattedDateTime()}</Text>
+<TouchableOpacity style={styles.invoiceButton}>
+  <MaterialCommunityIcons 
+    name="email-open-outline" 
+    size={18} 
+    color="#00b894" 
+  />
+  <Text style={styles.invoiceText}>Generate mail receipt</Text>
+</TouchableOpacity>
 
-          <Text style={styles.statusLabel}>Bus Number</Text>
-          <Text style={styles.statusValue}>
-            {busNumber || 'BMTC BUS KA57F6108'}
-          </Text>
+          <View style={styles.divider} />
 
-          <Text style={styles.statusLabel}>Validated By</Text>
-          <Text style={styles.statusValue}>Self</Text>
-        </View>
+          {/* VALIDATION DETAILS */}
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>Last Validated</Text>
+            <Text style={styles.statusValue}>{getFormattedDateTime()}</Text>
 
-        {/* Secure QR Code Container */}
-        <View style={styles.qrCard}>
-          <Image
-            source={require('../../assets/images/Gemini_Generated_Image_z0wwzhz0wwzhz0ww.png')}
-            style={styles.qrImage}
-            resizeMode="contain"
-          />
-        </View>
+            <Text style={styles.statusLabel}>Bus Number</Text>
+            <Text style={styles.statusValue}>{busNumber || 'BMTC BUS KA57F6108'}</Text>
 
-        {/* Interactive Terms Card Container */}
-        <View style={styles.termsCardContainer}>
-          <TouchableOpacity 
-            style={styles.termsButton} 
-            onPress={() => setIsExpanded(!isExpanded)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.termsText}>Terms and Conditions</Text>
-            <Ionicons 
-              name={isExpanded ? "chevron-up" : "chevron-down"} 
-              size={18} 
-              color="#666666" 
+            <Text style={styles.statusLabel}>Validated By</Text>
+            <Text style={styles.statusValue}>Self</Text>
+          </View>
+
+          {/* QR CODE */}
+          <View style={styles.qrContainer}>
+            <Image
+              source={require('../../assets/images/qr.png')}
+              style={styles.qrImage}
+              resizeMode="contain"
             />
+          </View>
+        </View>
+
+        {/* TERMS AND CONDITIONS */}
+        <View style={styles.termsCardContainer}>
+          <TouchableOpacity style={styles.termsButton} onPress={() => setIsExpanded(!isExpanded)}>
+            <Text style={styles.termsText}>Terms and Conditions</Text>
+            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#666" />
           </TouchableOpacity>
 
-          {/* Conditional Dropdown List Panel */}
           {isExpanded && (
             <View style={styles.dropdownContent}>
               <View style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>Pass is valid for travel for the services it has been purchased and until the expiry date printed on the pass</Text>
+                <Text style={styles.bulletText}>Pass is valid for travel until expiry date printed on the pass.</Text>
               </View>
               <View style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>In case the conductor asks for your ID proof, you can either show a physical/digital copy of the ID used at the time of booking.</Text>
+                <Text style={styles.bulletText}>Show ID proof used during booking whenever asked.</Text>
               </View>
               <View style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>Only one pass is allowed for one ID card</Text>
+                <Text style={styles.bulletText}>Only one pass is allowed per ID card.</Text>
               </View>
               <View style={styles.bulletRow}>
                 <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>Pass holders must show their passes to conductors or any authorised person on demand</Text>
-              </View>
-              <View style={styles.bulletRow}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>Improper/misuse of past results in withdrawal of pass attract penalty and pass holder will be liable to legal implications</Text>
-              </View>
-              <View style={styles.bulletRow}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>BMTC is not responsible if passenger/pass holder's mobile application is not working or switched off</Text>
-              </View>
-              <View style={styles.bulletRow}>
-                <Text style={styles.bulletDot}>•</Text>
-                <Text style={styles.bulletText}>BMTC is not responsible if passenger/pass holder has entered wrong ID number in mobile pass purchased and the same cannot be accepted</Text>
+                <Text style={styles.bulletText}>Improper misuse of pass may result in penalty.</Text>
               </View>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Success Modal Dialogue Overlay Container */}
-      <Modal 
-        visible={isSuccessVisible} 
-        transparent={true} 
-        animationType="fade"
-      >
+      {/* SUCCESS MODAL */}
+      <Modal visible={isSuccessVisible} transparent={true} animationType="fade">
         <View style={styles.successModalOverlay}>
           <View style={styles.successCardContainer}>
-            
-            <View style={styles.successDotIcon}>
-              <View style={styles.innerSuccessDot} />
+            <View style={styles.iconContainerWrapper}>
+              
+              {/* Outer Pulsing Glow Ring using pure Animated.View */}
+              <Animated.View
+                style={[
+                  styles.pulsingGlowRing,
+                  {
+                    opacity: opacityAnim,
+                    transform: [{ scale: scaleAnim }],
+                  },
+                ]}
+              />
+
+              {/* Inner Checkmark Container using pure Animated.View */}
+              <Animated.View
+                style={[
+                  styles.successDotIconAnimation,
+                  {
+                    backgroundColor: animationToggle ? '#0066ff' : '#00cc66',
+                    transform: [{ scale: checkScaleAnim }],
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark" size={26} color="#ffffff" />
+              </Animated.View>
             </View>
 
-            <Text style={styles.successHeadlineText}>
-              Self verification done{"\n"}successfully
-            </Text>
+            <Text style={styles.successHeadlineText}>Self verification done{"\n"}successfully</Text>
 
             <View style={styles.receiptMetaTable}>
               <View style={styles.metaTableRow}>
@@ -262,26 +332,60 @@ export default function PassDetails() {
               </View>
               <View style={styles.metaTableRow}>
                 <Text style={styles.metaTableLabel}>Pass valid till</Text>
-                <Text style={styles.metaTableValue}>24 May 2026, 11:59 PM</Text>
+                <Text style={styles.metaTableValue}>31 May 2026, 11:59 PM</Text>
               </View>
-              
               <View style={styles.dividerLine} />
-              
               <View style={[styles.metaTableRow, { marginBottom: 0, marginTop: 8 }]}>
-                <Text style={styles.fareLabelText}>Pass fare</Text>
+                <Text style={styles.fareLabelfare}>Pass fare</Text>
                 <Text style={styles.farePriceValue}>₹ 350.0</Text>
               </View>
             </View>
 
-            <TouchableOpacity 
-              style={styles.successActionButton} 
-              onPress={() => setIsSuccessVisible(false)}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity style={styles.successActionButton} onPress={handleVerificationDone}>
               <Text style={styles.successActionText}>Okay</Text>
             </TouchableOpacity>
-
           </View>
+        </View>
+      </Modal>
+
+      {/* FARE DETAILS POPUP MODAL */}
+      <Modal transparent={true} visible={showFare} animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={styles.farePopup}>
+            <Text style={styles.popupTitle}>Pass fare</Text>
+            <View style={styles.row}>
+              <Text style={styles.popupLabel}>Base Price</Text>
+              <Text style={styles.popupValue}>₹ 350.0</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.popupLabel}>GST</Text>
+              <Text style={styles.popupValue}>₹ 0.0</Text>
+            </View>
+            <View style={styles.row}>
+              <Text style={styles.popupLabel}>Toll Price</Text>
+              <Text style={styles.popupValue}>₹ 0.0</Text>
+            </View>
+            <View style={styles.line} />
+            <View style={styles.row}>
+              <Text style={styles.totalText}>Total Amount</Text>
+              <Text style={styles.totalValue}>₹ 350.0</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* IMAGE PREVIEW MODAL */}
+      <Modal visible={showImagePreview} transparent={true} animationType="fade">
+        <View style={styles.imageModalContainer}>
+          <Pressable style={styles.imageBackdrop} onPress={() => setShowImagePreview(false)} />
+          <TouchableOpacity style={styles.closePreviewButton} onPress={() => setShowImagePreview(false)}>
+            <Ionicons name="close" size={34} color="#fff" />
+          </TouchableOpacity>
+          <Image
+            source={require('../../assets/images/dophamine.jpg')}
+            style={styles.fullPreviewImage}
+            resizeMode="contain"
+          />
         </View>
       </Modal>
     </SafeAreaView>
@@ -307,7 +411,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '600',
   },
   cancelText: {
@@ -316,7 +420,9 @@ const styles = StyleSheet.create({
   },
   topCard: {
     backgroundColor: '#fff',
-    margin: 15,
+    marginHorizontal: 15,
+    marginTop: 25,
+    marginBottom: 15,
     borderRadius: 18,
     padding: 18,
   },
@@ -329,18 +435,16 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.8,
-    borderColor: '#0d47a1',
   },
   bmtcLogoImage: {
-    width: '108%',
-    height: '108%',
+    width: '90%',
+    height: '70%',
   },
   passTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#222',
   },
@@ -349,15 +453,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   greenBadge: {
-    backgroundColor: '#e9fff7',
+    backgroundColor: '#cffebb',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     marginRight: 10,
   },
   greenBadgeText: {
-    color: '#00b894',
-    fontWeight: '600',
+    color: '#7be07c',
+    fontWeight: '400',
   },
   grayBadge: {
     backgroundColor: '#f1f1f1',
@@ -367,7 +471,7 @@ const styles = StyleSheet.create({
   },
   grayBadgeText: {
     color: '#555',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   passRow: {
     flexDirection: 'row',
@@ -379,10 +483,10 @@ const styles = StyleSheet.create({
   },
   value: {
     color: '#222',
-    fontWeight: '600',
+    fontWeight: '400',
   },
   validateButton: {
-    backgroundColor: '#24e0c2',
+    backgroundColor: 'rgb(36, 224, 194)',
     marginTop: 25,
     borderRadius: 12,
     paddingVertical: 16,
@@ -396,7 +500,7 @@ const styles = StyleSheet.create({
   infoText: {
     textAlign: 'center',
     marginTop: 15,
-    color: '#888',
+    color: 'rgb(36, 224, 194)',
   },
   detailsCard: {
     backgroundColor: '#fff',
@@ -406,224 +510,289 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   bookingTitle: {
-    fontSize: 34,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '600',
     color: '#222',
-    marginBottom: 25,
   },
   detailsContent: {
     flexDirection: 'row',
   },
   smallLabel: {
-    color: '#888',
-    fontSize: 13,
-    marginTop: 12,
+    color: '#645b4b',
+    fontSize: 11,
+    marginTop: 10,
   },
   mainText: {
     color: '#222',
-    fontSize: 22,
-    fontWeight: '500',
+    fontSize: 15,
     marginTop: 4,
   },
   profileImage: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: 95,
+    height: 95,
+    borderRadius: 48,
     marginLeft: 15,
-    marginTop: 20,
+    marginTop: 6,
   },
   fareRow: {
-    marginTop: 25,
+    marginTop: 20,
     alignItems: 'flex-end',
   },
+  fareLabelText: {
+    fontSize: 16,
+    color: '#645b4b',
+    textDecorationLine: 'underline',
+    marginTop:-57,
+  },
   price: {
-    fontSize: 42,
-    fontWeight: '700',
+    fontSize: 27,
+    fontWeight: '500',
     color: '#222',
+    marginTop:-40,
   },
-  invoiceButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30,
-    borderWidth: 1,
-    borderColor: '#b2f5ea',
-    paddingVertical: 14,
-    borderRadius: 10,
-  },
+invoiceButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 10,
+  borderWidth: 1,
+  borderColor: '#b2f5ea',
+  paddingVertical: 14,
+  borderRadius: 10,
+  gap: 8, // This keeps a perfect 8px space between the envelope and the text
+},
   invoiceText: {
     color: '#00b894',
-    fontWeight: '600',
     marginLeft: 8,
+    fontSize: 14,
   },
   statusCard: {
-    backgroundColor: '#bbe5a3',
-    borderRadius: 18,
-    padding: 20,
-    marginHorizontal: 15,
-    marginBottom: 15,
+    backgroundColor: '#c8df8b',
+    borderRadius: 16,
+    padding: 18,
+    marginTop: 20,
   },
   statusLabel: {
-    fontSize: 12,
-    color: '#555555',
+    fontSize: 13,
+    color: '#544c49',
     marginBottom: 2,
   },
   statusValue: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111111',
+    color: '#000000',   
     marginBottom: 12,
   },
-  qrCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
-    padding: 24,
-    marginHorizontal: 15,
-    marginBottom: 15,
+  qrContainer: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    justifyContent: 'center',
+    marginTop: 15,
   },
   qrImage: {
-    width: 240,
-    height: 240,
+    width: 260,
+    height: 260,
   },
   termsCardContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff',
     borderRadius: 14,
     marginHorizontal: 15,
     marginBottom: 20,
     paddingVertical: 18,
     paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 1,
   },
   termsButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
   },
   termsText: {
     fontSize: 15,
-    color: '#555555',
-    fontWeight: '500',
+    color: '#555',
+    fontWeight: '600',
   },
   dropdownContent: {
-    marginTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#f1f1f1',
-    paddingTop: 10,
+    marginTop: 18,
   },
   bulletRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    paddingRight: 10,
+    marginBottom: 14,
   },
   bulletDot: {
+    marginRight: 10,
     fontSize: 16,
-    color: '#111111',
-    marginRight: 8,
-    lineHeight: 20,
   },
   bulletText: {
-    fontSize: 13,
-    color: '#555555',
-    lineHeight: 18,
     flex: 1,
+    color: '#555',
+    lineHeight: 20,
+    fontSize: 13,
   },
   successModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
   },
   successCardContainer: {
-    width: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingTop: 30,
-    paddingBottom: 24,
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 18,
+    padding: 25,
     alignItems: 'center',
-  },
-  successDotIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#e6f7ed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  innerSuccessDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#00b894',
   },
   successHeadlineText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2d3748',
+    fontWeight: '700',
+    marginBottom: 20,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
   },
   receiptMetaTable: {
     width: '100%',
-    marginBottom: 28,
+    marginBottom: 25,
   },
   metaTableRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
   },
   metaTableLabel: {
-    fontSize: 13,
-    color: '#718096',
+    fontSize: 14,
+    color: '#666',
   },
   metaTableValue: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#2d3748',
+    fontSize: 14,
+    color: '#111',
+    fontWeight: '600',
   },
   dividerLine: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#edf2f7',
-    marginTop: 12,
-    marginBottom: 4,
-  },
-  fareLabelText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#2d3748',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    marginTop: 8,
   },
   farePriceValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#2d3748',
+    color: '#111',
   },
   successActionButton: {
-    width: '100%',
     backgroundColor: '#00b894',
-    paddingVertical: 14,
+    paddingHorizontal: 40,
+    paddingVertical: 12,
     borderRadius: 10,
-    alignItems: 'center',
   },
   successActionText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '600',
+    color: '#fff',
+    fontWeight: '700',
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  farePopup: {
+    width: '85%',
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+  },
+  popupTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  popupLabel: {
+    fontSize: 18,
+    color: '#555',
+  },
+  popupValue: {
+    fontSize: 18,
+  },
+  line: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  totalText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  totalValue: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  divider: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#bdbdbd',
+    borderStyle: 'dashed',
+    marginVertical: 20,
+    width: '100%',
+  },
+  imageModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageBackdrop: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.82)',
+  },
+  fullPreviewImage: {
+    width: '68%',
+    height: '58%',
+    borderRadius: 18,
+  },
+  closePreviewButton: {
+    position: 'absolute',
+    top: 55,
+    right: 25,
+    zIndex: 10,
+    width: 55,
+    height: 55,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconContainerWrapper: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: 80,
+    alignSelf: 'center',
+    marginVertical: 15,
+    position: 'relative',
+  },
+  pulsingGlowRing: {
+    position: 'absolute',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: '#00cc66',
+  },
+  successDotIconAnimation: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#0066ff',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  fareLabelfare:{
+    fontSize: 16,
+    color: '#43403a',
   },
 });

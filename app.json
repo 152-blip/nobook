@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/images/logo.png"
-    }, // 🛠️ Fixed: Added missing closing brace and comma here
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -35,11 +35,19 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "74c9c5f4-88e6-41a5-978d-89b5893392c6"
+      }
+    },
+    "owner": "dophamine2"
   }
 }

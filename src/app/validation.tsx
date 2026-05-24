@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   View,
@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+// 1. IMPORT CAMERA COMPONENTS FROM EXPO
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -25,6 +27,9 @@ export default function ValidatePassScreen() {
   const [busDigits, setBusDigits] = useState(['', '', '', '']);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [selectedPrefix, setSelectedPrefix] = useState('Select bus number prefix');
+  
+  // 2. CAMERA PERMISSIONS STATE
+  const [permission, requestPermission] = useCameraPermissions();
 
   // References to handle jumping focus automatically across input fields
   const inputRefs = [
@@ -35,6 +40,7 @@ export default function ValidatePassScreen() {
   ];
 
   const prefixes = [
+    'select bus number prefix',
     'KA57F',
     'KA01F',
     'KA53F',
@@ -44,7 +50,19 @@ export default function ValidatePassScreen() {
     'KA41D',
     'KA42FA',
     'KA01FA',
+    'KA51AH',
+    'DU01AA',
+    'KA01AR',
+    'KAS7F',
+    'KA01AQ',
   ];
+
+  // Request camera permissions on mount
+  useEffect(() => {
+    if (!permission?.granted) {
+      requestPermission();
+    }
+  }, [permission]);
 
   const handleDigitChange = (text: string, index: number) => {
     const cleanText = text.replace(/[^0-9]/g, ''); 
@@ -59,7 +77,7 @@ export default function ValidatePassScreen() {
     const updatedCode = newDigits.join('');
     if (updatedCode.length === 4) {
       inputRefs[index].current?.blur();
-      
+
       // Fallback to a default prefix if they didn't select one explicitly
       const finalPrefix = selectedPrefix !== 'Select bus number prefix' ? selectedPrefix : 'KA57F';
       const formattedBusNumber = `BMTC BUS ${finalPrefix}${updatedCode}`;
@@ -67,8 +85,8 @@ export default function ValidatePassScreen() {
       // AUTOMATIC REDIRECTION: Pass both validation state and the combined bus number string
       router.replace({
         pathname: './passdetails', 
-        params: { 
-          validated: 'true',
+          params: {
+            validated: 'true',
           busNumber: formattedBusNumber // <--- Passing the final string here
         }
       });
@@ -87,65 +105,129 @@ export default function ValidatePassScreen() {
     setIsDropdownOpen(false);
   };
 
+  // 3. HANDLE AUTOMATIC QR BARCODE SCANNING
+  const handleBarcodeScanned = ({ data }: { data: string }) => {
+    if (data) {
+      // Redirect immediately with scanned data
+      router.replace({
+        pathname: './passdetails',
+        params: {
+          validated: 'true',
+          busNumber: data,
+        },
+      });
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      
+
       {/* Top Half: Camera Live Scanner Area */}
       <View style={styles.cameraContainer}>
-        <View style={styles.mockCameraView}>
-          
-          <View style={styles.toastOverlay}>
-            <Ionicons name="bus-outline" size={18} color="#1c3d5a" />
-            <Text style={styles.toastText}>Enter bus number or Scan QR to validate</Text>
-          </View>
-
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#ffffff" />
-          </TouchableOpacity>
-
-          <View style={styles.cameraControlsRow}>
-            <View style={styles.zoomSliderContainer}>
-              <Ionicons name="search" size={16} color="#ffffff" />
-              <View style={styles.zoomTrack} />
-              <View style={styles.zoomThumb} />
+        
+        {/* 4. REPLACED STATIC VIEW WITH ACTIVATED CAMERAVIEW */}
+        {permission?.granted ? (
+          <CameraView 
+            style={styles.mockCameraView} 
+            facing="back"
+            barcodeScannerSettings={{
+              barcodeTypes: ['qr'],
+            }}
+            onBarcodeScanned={handleBarcodeScanned}
+          >
+            {/* TOAST */}
+            <View style={styles.toastOverlay}>
+              <Ionicons name="bus-outline" size={18} color="#1c3d5a" />
+              <Text style={styles.toastText}>Enter bus number or Scan QR to validate</Text>
             </View>
-            
-            <TouchableOpacity style={styles.actionIconButton}>
-              <Ionicons name="flash-off" size={22} color="#ffffff" />
-            </TouchableOpacity>
-          </View>
 
-        </View>
+            {/* BACK BUTTON */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color="#ffffff"
+              />
+            </TouchableOpacity>
+
+            {/* SCANNER FRAME */}
+            <View style={styles.scanFrameWrapper}>
+              <View style={styles.scanFrame}>
+                <View style={[styles.corner, styles.topLeft]} />
+                <View style={[styles.corner, styles.topRight]} />
+                <View style={[styles.corner, styles.bottomLeft]} />
+                <View style={[styles.corner, styles.bottomRight]} />
+              </View>
+            </View>
+
+            {/* CONTROLS */}
+            <View style={styles.cameraControlsRow}>
+              <View style={styles.zoomSliderContainer}>
+                <Ionicons
+                  name="search"
+                  size={16}
+                  color="#ffffff"
+                />
+                <View style={styles.zoomTrack}>
+                  <View style={styles.zoomThumb} />
+                </View>
+              </View>
+
+              <TouchableOpacity style={styles.actionIconButton}>
+                <Ionicons
+                  name="flash-off"
+                  size={22}
+                  color="#ffffff"
+                />
+              </TouchableOpacity>
+            </View>
+          </CameraView>
+        ) : (
+          // Fallback UI while permission is loading or denied
+          <View style={[styles.mockCameraView, { justifyContent: 'center', alignItems: 'center' }]}>
+            <Text style={{ color: '#ffffff', fontSize: 16 }}>Requesting camera permission...</Text>
+          </View>
+        )}
+
       </View>
 
-      {/* Bottom Half: Form Entry Panel */}
+      {/* BOTTOM SHEET */}
       <View style={styles.bottomSheetContainer}>
         <View style={styles.dragHandle} />
-        
         <Text style={styles.sheetTitle}>Enter bus number</Text>
 
-        <TouchableOpacity 
-          style={styles.dropdownSelector} 
-          activeOpacity={0.7}
+        {/* DROPDOWN */}
+        <TouchableOpacity
+          style={styles.dropdownSelector}
+          activeOpacity={0.8}
           onPress={() => setIsDropdownOpen(true)}
         >
-          <Text style={[
-            styles.dropdownPlaceholderText, 
-            selectedPrefix !== 'Select bus number prefix' && styles.dropdownSelectedText
-          ]}>
+          <Text
+            style={[
+              styles.dropdownPlaceholderText,
+              selectedPrefix !== 'Select bus number prefix' && styles.dropdownSelectedText,
+            ]}
+          >
             {selectedPrefix}
           </Text>
-          <Ionicons name="chevron-down" size={18} color="#555555" />
+          <Ionicons
+            name="chevron-down"
+            size={18}
+            color="#555555"
+          />
         </TouchableOpacity>
 
-        {/* Input Character Boxes Row */}
+        {/* DIGIT BOXES */}
         <View style={styles.inputMatrixRow}>
           {busDigits.map((digit, index) => (
             <TextInput
               key={index}
               ref={inputRefs[index]}
               style={styles.digitBox}
-              keyboardType="number-pad" // Enforces standard layout number pad keyboard on focus
+              keyboardType="number-pad"
               maxLength={1}
               textAlign="center"
               value={digit}
@@ -153,35 +235,33 @@ export default function ValidatePassScreen() {
               onKeyPress={(e) => handleKeyPress(e, index)}
               placeholderTextColor="#bbbbbb"
               selectTextOnFocus={true}
+              statusBarHidden={true}
             />
           ))}
         </View>
       </View>
 
-      {/* Prefix Selection Dropdown Modal */}
+      {/* DROPDOWN MODAL */}
       <Modal
         visible={isDropdownOpen}
         transparent={true}
         animationType="fade"
         onRequestClose={() => setIsDropdownOpen(false)}
       >
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
           onPress={() => setIsDropdownOpen(false)}
         >
           <View style={styles.dropdownCard}>
-            <View style={styles.dropdownHeader}>
-              <Text style={styles.dropdownHeaderTitle}>Select bus number prefix</Text>
-            </View>
-            
-            <ScrollView showsVerticalScrollIndicator={true}>
+            <View style={styles.dropdownHeader} />
+            <ScrollView showsVerticalScrollIndicator={false}>
               {prefixes.map((prefix, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
                     styles.prefixOption,
-                    index === prefixes.length - 1 && { borderBottomWidth: 0 }
+                    index === prefixes.length - 1 && { borderBottomWidth: 0 },
                   ]}
                   onPress={() => handleSelectPrefix(prefix)}
                 >
@@ -208,7 +288,6 @@ const styles = StyleSheet.create({
   },
   mockCameraView: {
     flex: 1,
-    backgroundColor: '#3a474a', 
     justifyContent: 'space-between',
     paddingVertical: 45,
     paddingHorizontal: 20,
@@ -222,10 +301,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 25,
     marginTop: 15,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
   },
   toastText: {
     color: '#1967d2',
@@ -239,6 +314,51 @@ const styles = StyleSheet.create({
     left: 20,
     zIndex: 10,
   },
+  scanFrameWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 250,
+    height: 250,
+    borderRadius: 24,
+    position: 'relative',
+  },
+  corner: {
+    position: 'absolute',
+    width: 45,
+    height: 45,
+    borderColor: '#ffffff',
+  },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 5,
+    borderLeftWidth: 5,
+    borderTopLeftRadius: 20,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 5,
+    borderRightWidth: 5,
+    borderTopRightRadius: 20,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 5,
+    borderLeftWidth: 5,
+    borderBottomLeftRadius: 20,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 5,
+    borderRightWidth: 5,
+    borderBottomRightRadius: 20,
+  },
   cameraControlsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -250,34 +370,36 @@ const styles = StyleSheet.create({
   zoomSliderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 50,
     flex: 1,
     marginRight: 20,
   },
   zoomTrack: {
     flex: 1,
     height: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    backgroundColor: 'rgba(255,255,255,0.35)',
     marginLeft: 10,
+    borderRadius: 5,
     position: 'relative',
+    justifyContent: 'center',
   },
   zoomThumb: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
     backgroundColor: '#ffffff',
     position: 'absolute',
-    left: '25%',
-    top: -4,
+    left: 0,
+    top: -5,
   },
   actionIconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -302,7 +424,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f2942',
     marginBottom: 20,
-    textAlign: 'left',
   },
   dropdownSelector: {
     flexDirection: 'row',
@@ -336,25 +457,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     fontSize: 22,
     fontWeight: '600',
-    color: '#111111',
+    color: '#151111',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#777272',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    padding: 0,
+    
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 30,
   },
   dropdownCard: {
-    width: '100%',
+    width: '80%',
     maxHeight: SCREEN_HEIGHT * 0.55,
     backgroundColor: '#ffffff',
     borderRadius: 14,
     paddingVertical: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 5,
